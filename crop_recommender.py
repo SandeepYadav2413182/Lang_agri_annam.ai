@@ -14,6 +14,7 @@ class CropRecommender:
         # Define a list of common crops with their climate requirements
         # This would ideally come from a database in a real application
         self.crop_data = {
+            # Common global crops
             'Corn': {
                 'min_temp': 10,
                 'max_temp': 35,
@@ -178,6 +179,74 @@ class CropRecommender:
                 'frost_tolerant': True,
                 'growing_season': 'Spring/Fall',
                 'soil_pH': (6.0, 7.0)
+            },
+            
+            # Indian crops
+            'Sugarcane': {
+                'min_temp': 15,
+                'max_temp': 40,
+                'optimal_temp': 30,
+                'min_rainfall': 750,
+                'max_rainfall': 1500,
+                'drought_tolerant': False,
+                'frost_tolerant': False,
+                'growing_season': 'Year-round',
+                'soil_pH': (6.0, 8.0)
+            },
+            'Turmeric': {
+                'min_temp': 20,
+                'max_temp': 38,
+                'optimal_temp': 30,
+                'min_rainfall': 1500,
+                'max_rainfall': 2500,
+                'drought_tolerant': False,
+                'frost_tolerant': False,
+                'growing_season': 'Year-round',
+                'soil_pH': (5.5, 7.5)
+            },
+            'Millet': {
+                'min_temp': 15,
+                'max_temp': 40,
+                'optimal_temp': 28,
+                'min_rainfall': 350,
+                'max_rainfall': 800,
+                'drought_tolerant': True,
+                'frost_tolerant': False,
+                'growing_season': 'Summer',
+                'soil_pH': (5.5, 8.0)
+            },
+            'Chickpeas': {
+                'min_temp': 10,
+                'max_temp': 35,
+                'optimal_temp': 24,
+                'min_rainfall': 400,
+                'max_rainfall': 1000,
+                'drought_tolerant': True,
+                'frost_tolerant': False,
+                'growing_season': 'Winter',
+                'soil_pH': (6.0, 9.0)
+            },
+            'Mustard': {
+                'min_temp': 10,
+                'max_temp': 35,
+                'optimal_temp': 20,
+                'min_rainfall': 250,
+                'max_rainfall': 800,
+                'drought_tolerant': True,
+                'frost_tolerant': True,
+                'growing_season': 'Winter',
+                'soil_pH': (5.5, 7.5)
+            },
+            'Jute': {
+                'min_temp': 18,
+                'max_temp': 38,
+                'optimal_temp': 30,
+                'min_rainfall': 1000,
+                'max_rainfall': 2500,
+                'drought_tolerant': False,
+                'frost_tolerant': False,
+                'growing_season': 'Summer',
+                'soil_pH': (6.0, 7.5)
             }
         }
         

@@ -5,28 +5,21 @@ import datetime
 import pickle
 import time
 
-def get_state_coordinates(state, county=None):
+def get_state_coordinates(location_query):
     """
-    Get the latitude and longitude for a U.S. state and optional county
+    Get the latitude and longitude for a location query string
     
     Args:
-        state (str): The state name
-        county (str, optional): The county name
+        location_query (str): Location query (e.g., "Mumbai, Maharashtra, India")
     
     Returns:
         tuple: (latitude, longitude) coordinates
     """
     try:
-        # Build the search query
-        if county:
-            query = f"{county}, {state}, USA"
-        else:
-            query = f"{state}, USA"
-        
         # Use Nominatim API for geocoding (OpenStreetMap data)
         base_url = "https://nominatim.openstreetmap.org/search"
         params = {
-            "q": query,
+            "q": location_query,
             "format": "json",
             "limit": 1
         }
@@ -46,7 +39,7 @@ def get_state_coordinates(state, county=None):
                 return float(results[0]["lat"]), float(results[0]["lon"])
         
         # If we get here, something went wrong with the API request
-        print(f"Could not find coordinates for {query}")
+        print(f"Could not find coordinates for {location_query}")
         return None, None
     
     except Exception as e:

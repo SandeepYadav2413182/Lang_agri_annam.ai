@@ -310,11 +310,22 @@ class WeatherService:
         else:
             is_summer = 11 <= current_month or current_month <= 3
         
-        # Generate temperature based on season
-        if is_summer:
-            temp = random.uniform(20, 35)
+        # Adjust temperatures for tropical regions
+        is_tropical = abs(lat) < 23.5
+        
+        # Generate temperature based on season and region
+        if is_tropical:
+            # Tropical regions have less seasonal variation
+            if is_summer:
+                temp = random.uniform(26, 38)
+            else:
+                temp = random.uniform(22, 34)
         else:
-            temp = random.uniform(0, 20)
+            # Non-tropical regions
+            if is_summer:
+                temp = random.uniform(20, 35)
+            else:
+                temp = random.uniform(0, 20)
         
         # Adjust based on absolute latitude (colder at poles)
         temp_adjustment = (90 - abs(lat)) / 90 * 20
@@ -420,15 +431,28 @@ class WeatherService:
                 is_spring = 10 <= month <= 11
                 is_fall = 4 <= month <= 5
             
-            # Base temperature depends on season
-            if is_summer:
-                base_temp = random.uniform(20, 35)
-            elif is_winter:
-                base_temp = random.uniform(-5, 15)
-            elif is_spring:
-                base_temp = random.uniform(10, 25)
-            else:  # fall
-                base_temp = random.uniform(5, 20)
+            # Adjust for tropical regions (within 23.5° of equator)
+            is_tropical = abs(lat) < 23.5
+            
+            # Base temperature depends on season and region
+            if is_tropical:
+                # Tropical regions have less seasonal variation
+                if is_summer:
+                    base_temp = random.uniform(26, 38)
+                elif is_winter:
+                    base_temp = random.uniform(22, 34)
+                else:  # spring or fall
+                    base_temp = random.uniform(24, 36)
+            else:
+                # Non-tropical regions with more seasonal variation
+                if is_summer:
+                    base_temp = random.uniform(20, 35)
+                elif is_winter:
+                    base_temp = random.uniform(-5, 15)
+                elif is_spring:
+                    base_temp = random.uniform(10, 25)
+                else:  # fall
+                    base_temp = random.uniform(5, 20)
             
             # Adjust based on latitude (colder at poles)
             temp_adjustment = (90 - abs(lat)) / 90

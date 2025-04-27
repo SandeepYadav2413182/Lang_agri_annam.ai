@@ -50,28 +50,46 @@ with st.sidebar:
     st.header("Location Settings")
     
     # Location selection
-    location_type = st.radio("Select location by:", ("State/County", "Coordinates"))
+    location_type = st.radio("Select location by:", ("Country/Region", "Coordinates"))
     
-    if location_type == "State/County":
-        state = st.selectbox("Select State", 
-                            ["Alabama", "Alaska", "Arizona", "Arkansas", "California", 
-                             "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", 
-                             "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", 
-                             "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", 
-                             "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana",
-                             "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", 
-                             "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", 
-                             "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", 
-                             "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", 
-                             "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"])
+    if location_type == "Country/Region":
+        country = st.selectbox("Select Country", ["United States", "India", "Other"])
         
-        county = st.text_input("Enter County (optional)")
+        if country == "United States":
+            region = st.selectbox("Select State", 
+                                ["Alabama", "Alaska", "Arizona", "Arkansas", "California", 
+                                 "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", 
+                                 "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", 
+                                 "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", 
+                                 "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana",
+                                 "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", 
+                                 "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", 
+                                 "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", 
+                                 "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", 
+                                 "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"])
+            subregion = st.text_input("Enter County (optional)")
+        
+        elif country == "India":
+            region = st.selectbox("Select State", 
+                               ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", 
+                                "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", 
+                                "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", 
+                                "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
+                                "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", 
+                                "Uttar Pradesh", "Uttarakhand", "West Bengal",
+                                "Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry"])
+            subregion = st.text_input("Enter District/City (optional)")
+        
+        else:  # Other countries
+            region = st.text_input("Enter Region/Province/State")
+            subregion = st.text_input("Enter City/District (optional)")
         
         if st.button("Set Location"):
             with st.spinner("Getting coordinates..."):
-                lat, lon = get_state_coordinates(state, county)
+                location_query = f"{subregion + ', ' if subregion else ''}{region}, {country}"
+                lat, lon = get_state_coordinates(location_query)
                 if lat and lon:
-                    st.session_state.location = {"lat": lat, "lon": lon, "name": f"{county + ', ' if county else ''}{state}"}
+                    st.session_state.location = {"lat": lat, "lon": lon, "name": location_query}
                     st.success(f"Location set to {st.session_state.location['name']}")
                 else:
                     st.error("Could not find coordinates for this location")
