@@ -385,9 +385,142 @@ class WeatherPatternAnalyzer:
             result['descriptions'].append("Unable to analyze weather trends due to data issues.")
             return result
     
+    def get_seasonal_recommendations(self, current_season, trends, historical_df):
+        """
+        Generate seasonal agricultural recommendations based on weather data
+        
+        Args:
+            current_season (str): Current season ('Winter', 'Spring', 'Summer', 'Fall')
+            trends (list): List of weather trend descriptions
+            historical_df (pd.DataFrame): Historical weather data
+            
+        Returns:
+            dict: Dictionary containing seasonal recommendations
+        """
+        recommendations = {
+            'general': [],
+            'crops': {}
+        }
+        
+        try:
+            # Extract some basic climate indicators
+            avg_temp = historical_df['temp_avg'].mean() if 'temp_avg' in historical_df.columns else None
+            rainfall = historical_df['rain_sum'].sum() if 'rain_sum' in historical_df.columns else None
+            
+            # Check for trends that might impact recommendations
+            drought_risk = any('drought' in trend.lower() or 'dry' in trend.lower() for trend in trends)
+            flood_risk = any('flood' in trend.lower() or 'heavy rain' in trend.lower() for trend in trends)
+            temp_increasing = any('temperature' in trend.lower() and 'increasing' in trend.lower() for trend in trends)
+            temp_decreasing = any('temperature' in trend.lower() and 'decreasing' in trend.lower() for trend in trends)
+            
+            # General recommendations based on season
+            if current_season == 'Spring':
+                recommendations['general'].extend([
+                    "Prepare soil with proper amendments and nutrients",
+                    "Start sowing cold-resistant varieties as soil warms up",
+                    "Monitor soil moisture as temperatures begin to rise",
+                    "Check for winter damage and repair irrigation systems"
+                ])
+                
+                if drought_risk:
+                    recommendations['general'].append("Consider installing moisture-preserving mulches")
+                    
+                if flood_risk:
+                    recommendations['general'].append("Ensure proper drainage systems are operational")
+                    
+                recommendations['crops']['Leafy Greens'] = [
+                    "Plant lettuces, spinach, and other greens early in the season",
+                    "Use row covers to protect from late frosts"
+                ]
+                
+                recommendations['crops']['Root Vegetables'] = [
+                    "Prepare for planting carrots, radishes and beets",
+                    "Ensure soil is loose and free of stones for good root development"
+                ]
+                
+            elif current_season == 'Summer':
+                recommendations['general'].extend([
+                    "Monitor irrigation needs closely during hot periods",
+                    "Apply mulch to reduce water evaporation from soil",
+                    "Watch for heat stress in sensitive crops",
+                    "Regular pest monitoring is crucial in warm weather"
+                ])
+                
+                if drought_risk:
+                    recommendations['general'].extend([
+                        "Implement water conservation practices",
+                        "Consider drip irrigation to minimize water loss"
+                    ])
+                    
+                if flood_risk:
+                    recommendations['general'].append("Ensure raised beds have adequate drainage")
+                
+                recommendations['crops']['Tomatoes'] = [
+                    "Support plants with stakes or cages",
+                    "Monitor for leaf diseases during humid periods"
+                ]
+                
+                recommendations['crops']['Corn'] = [
+                    "Ensure adequate water during tasseling stage",
+                    "Consider side-dressing with nitrogen fertilizer"
+                ]
+                
+            elif current_season == 'Fall':
+                recommendations['general'].extend([
+                    "Harvest summer crops and prepare for cold-season planting",
+                    "Consider cover crops for fields that will remain fallow",
+                    "Begin soil testing for next season planning",
+                    "Clean and store tools and equipment properly"
+                ])
+                
+                recommendations['crops']['Winter Greens'] = [
+                    "Plant cold-hardy varieties like kale and collards",
+                    "Consider row covers or cold frames for extending the season"
+                ]
+                
+                recommendations['crops']['Root Vegetables'] = [
+                    "Plant storage crops like carrots and beets for winter harvesting",
+                    "Ensure proper storage conditions after harvest"
+                ]
+                
+            else:  # Winter
+                recommendations['general'].extend([
+                    "Plan next season's crop rotation and purchases",
+                    "Repair equipment and infrastructure during downtime",
+                    "Review last season's notes and adjust planning accordingly",
+                    "Monitor stored produce for any signs of spoilage"
+                ])
+                
+                if temp_increasing:
+                    recommendations['general'].append("Be prepared for early pest emergence if temperatures rise unusually")
+                
+                recommendations['crops']['Cold-Season Crops'] = [
+                    "In warmer areas, consider planting frost-resistant varieties",
+                    "Protect overwintering crops with appropriate covers"
+                ]
+            
+            # Add recommendations about climate trends regardless of season
+            if rainfall is not None and rainfall < 500:
+                recommendations['general'].append("Annual rainfall is below average; consider drought-resistant crop varieties")
+            elif rainfall is not None and rainfall > 1200:
+                recommendations['general'].append("Annual rainfall is high; ensure good drainage and consider raised beds")
+            
+            if avg_temp is not None and temp_increasing:
+                recommendations['general'].append("Temperatures are trending warmer; plan for earlier planting dates but watch for early season frost events")
+            elif avg_temp is not None and temp_decreasing:
+                recommendations['general'].append("Temperatures are trending cooler; consider cold-hardy varieties and season extension techniques")
+            
+            return recommendations
+            
+        except Exception as e:
+            print(f"Error generating seasonal recommendations: {str(e)}")
+            # Provide fallback recommendations
+            recommendations['general'].append("Plan your agricultural activities according to local seasonal patterns")
+            return recommendations
+    
     def _calculate_trend(self, df, column):
         """
-        Calculate the trend (slope) for a specific column in the dataframe
+        Calculate the trend (slopee) for a specific column in the dataframe
         
         Args:
             df (pd.DataFrame): DataFrame with datetime index
