@@ -78,6 +78,10 @@ if 'user_id' not in st.session_state:
     user = db.get_or_create_user()
     st.session_state.user_id = user['id']  # Access as dictionary
 
+# Language setting - default to English
+if 'language' not in st.session_state:
+    st.session_state.language = "English"  # Options: "English", "中文" (Chinese), "हिंदी" (Hindi)
+
 if 'location' not in st.session_state:
     # Try to load default location from DB
     default_loc = db.get_default_location(st.session_state.user_id)
@@ -210,10 +214,25 @@ with profile_tab:
         # Let user update their name
         user_name = st.text_input("Your Name", value=st.session_state.user_name)
         
+        # Language selection
+        selected_language = st.selectbox("Language / 语言 / भाषा", 
+                                      ["English", "中文 (Chinese)", "हिंदी (Hindi)"],
+                                      index=0 if st.session_state.language == "English" else 
+                                           (1 if st.session_state.language == "中文" else 2))
+        
         if st.button("Update Profile"):
             # Update user profile (we create a new user here, but in a real app, we'd update)
             updated_user = db.get_or_create_user(name=user_name)
             st.session_state.user_name = user_name
+            
+            # Update language preference
+            language_code = "English"
+            if selected_language == "中文 (Chinese)":
+                language_code = "中文"
+            elif selected_language == "हिंदी (Hindi)":
+                language_code = "हिंदी"
+            st.session_state.language = language_code
+            
             st.success("Profile updated successfully!")
     
     st.markdown("</div>", unsafe_allow_html=True)
@@ -357,7 +376,7 @@ with settings_tab:
     location_type = st.radio("Find location by:", ("Country/Region", "Coordinates"))
     
     if location_type == "Country/Region":
-        country = st.selectbox("Select Country", ["United States", "India", "Other"])
+        country = st.selectbox("Select Country", ["United States", "India", "China", "Other"])
         
         if country == "United States":
             region = st.selectbox("Select State", 
@@ -383,6 +402,21 @@ with settings_tab:
                                 "Uttar Pradesh", "Uttarakhand", "West Bengal",
                                 "Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry"])
             subregion = st.text_input("Enter District/City (optional)")
+        
+        elif country == "China":
+            region = st.selectbox("Select Province/Region", 
+                              ["Beijing (北京)", "Shanghai (上海)", "Tianjin (天津)", "Chongqing (重庆)",
+                               "Anhui (安徽省)", "Fujian (福建省)", "Gansu (甘肃省)", "Guangdong (广东省)",
+                               "Guangxi (广西壮族自治区)", "Guizhou (贵州省)", "Hainan (海南省)", 
+                               "Hebei (河北省)", "Heilongjiang (黑龙江省)", "Henan (河南省)",
+                               "Hubei (湖北省)", "Hunan (湖南省)", "Inner Mongolia (内蒙古自治区)",
+                               "Jiangsu (江苏省)", "Jiangxi (江西省)", "Jilin (吉林省)",
+                               "Liaoning (辽宁省)", "Ningxia (宁夏回族自治区)", "Qinghai (青海省)",
+                               "Shaanxi (陕西省)", "Shandong (山东省)", "Shanxi (山西省)",
+                               "Sichuan (四川省)", "Tibet (西藏自治区)", "Xinjiang (新疆维吾尔自治区)",
+                               "Yunnan (云南省)", "Zhejiang (浙江省)",
+                               "Hong Kong (香港)", "Macau (澳门)", "Taiwan (台湾)"])
+            subregion = st.text_input("Enter City/Prefecture (城市/地区) (optional)")
         
         else:  # Other countries
             region = st.text_input("Enter Region/Province/State")

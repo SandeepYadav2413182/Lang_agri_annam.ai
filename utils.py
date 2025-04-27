@@ -10,7 +10,7 @@ def get_state_coordinates(location_query):
     Get the latitude and longitude for a location query string
     
     Args:
-        location_query (str): Location query (e.g., "Mumbai, Maharashtra, India")
+        location_query (str): Location query (e.g., "Mumbai, Maharashtra, India", "北京市, 中国")
     
     Returns:
         tuple: (latitude, longitude) coordinates
@@ -18,10 +18,13 @@ def get_state_coordinates(location_query):
     try:
         # Use Nominatim API for geocoding (OpenStreetMap data)
         base_url = "https://nominatim.openstreetmap.org/search"
+        
+        # Default parameters
         params = {
             "q": location_query,
             "format": "json",
-            "limit": 1
+            "limit": 1,
+            "accept-language": "en,zh,hi"  # Support English, Chinese, and Hindi
         }
         
         # Add a user agent as required by Nominatim usage policy
@@ -37,6 +40,33 @@ def get_state_coordinates(location_query):
             if results:
                 # Return latitude and longitude as floats
                 return float(results[0]["lat"]), float(results[0]["lon"])
+            
+            # If no results, try with structured parameters for better results with Chinese addresses
+            if "中国" in location_query or "China" in location_query:
+                # Extract components from location query
+                parts = [part.strip() for part in location_query.split(',')]
+                
+                structured_params = {
+                    "country": "China",
+                    "format": "json",
+                    "limit": 1,
+                    "accept-language": "en,zh"
+                }
+                
+                if len(parts) >= 2:
+                    if "省" in parts[0] or "自治区" in parts[0]:
+                        structured_params["state"] = parts[0]
+                    else:
+                        structured_params["city"] = parts[0]
+                
+                # Make the structured request
+                response = requests.get(base_url, params=structured_params, headers=headers)
+                
+                if response.status_code == 200:
+                    results = response.json()
+                    if results:
+                        # Return latitude and longitude as floats
+                        return float(results[0]["lat"]), float(results[0]["lon"])
         
         # If we get here, something went wrong with the API request
         print(f"Could not find coordinates for {location_query}")

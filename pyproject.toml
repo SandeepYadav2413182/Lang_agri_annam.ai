@@ -15,4 +15,5 @@ dependencies = [
     "sqlalchemy>=2.0.40",
     "streamlit-chat>=0.1.1",
     "streamlit>=1.44.1",
+    "trafilatura>=2.0.0",
 ]
