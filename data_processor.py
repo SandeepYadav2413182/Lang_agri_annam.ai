@@ -93,6 +93,12 @@ class DataProcessor:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
+        # Handle duplicate dates before setting as index
+        # If there are duplicate dates, keep the first occurrence
+        if df['date'].duplicated().any():
+            print("Found duplicate dates in historical data, keeping the first occurrence of each date")
+            df = df.drop_duplicates(subset=['date'], keep='first')
+            
         # Set date as index for time series analysis
         df = df.set_index('date', drop=False)
         
