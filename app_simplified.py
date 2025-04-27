@@ -215,10 +215,26 @@ with profile_tab:
         user_name = st.text_input("Your Name", value=st.session_state.user_name)
         
         # Language selection
-        selected_language = st.selectbox("Language / 语言 / भाषा", 
-                                      ["English", "中文 (Chinese)", "हिंदी (Hindi)"],
+        selected_language = st.selectbox("Language / 语言 / भाषा / ภาษา / 言語 / 언어", 
+                                      ["English", "中文 (Chinese)", "हिंदी (Hindi)", 
+                                       "ไทย (Thai)", "日本語 (Japanese)", "한국어 (Korean)", 
+                                       "Tiếng Việt (Vietnamese)", "Bahasa Indonesia", 
+                                       "Bahasa Malaysia", "မြန်မာ (Myanmar)", "नेपाली (Nepali)", 
+                                       "ভাষা (Bengali)", "ភាសាខ្មែរ (Khmer)", "Монгол (Mongolian)"],
                                       index=0 if st.session_state.language == "English" else 
-                                           (1 if st.session_state.language == "中文" else 2))
+                                           (1 if st.session_state.language == "中文" else 
+                                           (2 if st.session_state.language == "हिंदी" else 
+                                           (3 if st.session_state.language == "ไทย" else 
+                                           (4 if st.session_state.language == "日本語" else 
+                                           (5 if st.session_state.language == "한국어" else 
+                                           (6 if st.session_state.language == "Tiếng Việt" else 
+                                           (7 if st.session_state.language == "Bahasa Indonesia" else 
+                                           (8 if st.session_state.language == "Bahasa Malaysia" else 
+                                           (9 if st.session_state.language == "မြန်မာ" else 
+                                           (10 if st.session_state.language == "नेपाली" else 
+                                           (11 if st.session_state.language == "ভাষা" else 
+                                           (12 if st.session_state.language == "ភាសាខ្មែរ" else 
+                                           (13 if st.session_state.language == "Монгол" else 0))))))))))))))
         
         if st.button("Update Profile"):
             # Update user profile (we create a new user here, but in a real app, we'd update)
@@ -226,11 +242,24 @@ with profile_tab:
             st.session_state.user_name = user_name
             
             # Update language preference
-            language_code = "English"
-            if selected_language == "中文 (Chinese)":
-                language_code = "中文"
-            elif selected_language == "हिंदी (Hindi)":
-                language_code = "हिंदी"
+            language_map = {
+                "English": "English",
+                "中文 (Chinese)": "中文",
+                "हिंदी (Hindi)": "हिंदी",
+                "ไทย (Thai)": "ไทย",
+                "日本語 (Japanese)": "日本語",
+                "한국어 (Korean)": "한국어",
+                "Tiếng Việt (Vietnamese)": "Tiếng Việt",
+                "Bahasa Indonesia": "Bahasa Indonesia",
+                "Bahasa Malaysia": "Bahasa Malaysia",
+                "မြန်မာ (Myanmar)": "မြန်မာ",
+                "नेपाली (Nepali)": "नेपाली",
+                "ভাষা (Bengali)": "ভাষা",
+                "ភាសាខ្មែរ (Khmer)": "ភាសាខ្មែរ",
+                "Монгол (Mongolian)": "Монгол"
+            }
+            
+            language_code = language_map.get(selected_language, "English")
             st.session_state.language = language_code
             
             st.success("Profile updated successfully!")
@@ -376,7 +405,12 @@ with settings_tab:
     location_type = st.radio("Find location by:", ("Country/Region", "Coordinates"))
     
     if location_type == "Country/Region":
-        country = st.selectbox("Select Country", ["United States", "India", "China", "Other"])
+        country = st.selectbox("Select Country", ["United States", "India", "China", 
+                                       "Thailand", "Japan", "South Korea", "Vietnam", 
+                                       "Indonesia", "Malaysia", "Myanmar", "Nepal", 
+                                       "Bhutan", "Bangladesh", "Cambodia", "Taiwan", 
+                                       "Mongolia", "Kazakhstan", "Kyrgyzstan", "Uzbekistan", 
+                                       "Singapore", "Hong Kong", "Laos", "Other"])
         
         if country == "United States":
             region = st.selectbox("Select State", 
@@ -417,6 +451,50 @@ with settings_tab:
                                "Yunnan (云南省)", "Zhejiang (浙江省)",
                                "Hong Kong (香港)", "Macau (澳门)", "Taiwan (台湾)"])
             subregion = st.text_input("Enter City/Prefecture (城市/地区) (optional)")
+            
+        elif country == "Thailand":
+            region = st.selectbox("Select Province", 
+                              ["Bangkok (กรุงเทพมหานคร)", "Chiang Mai (เชียงใหม่)", "Chiang Rai (เชียงราย)", 
+                               "Phuket (ภูเก็ต)", "Krabi (กระบี่)", "Ayutthaya (พระนครศรีอยุธยา)", 
+                               "Pattaya (พัทยา)", "Hua Hin (หัวหิน)", "Koh Samui (เกาะสมุย)", 
+                               "Chonburi (ชลบุรี)", "Songkhla (สงขลา)", "Hat Yai (หาดใหญ่)", 
+                               "Sukhothai (สุโขทัย)", "Khon Kaen (ขอนแก่น)", "Udon Thani (อุดรธานี)", 
+                               "Nakhon Ratchasima (นครราชสีมา)", "Nonthaburi (นนทบุรี)", 
+                               "Samut Prakan (สมุทรปราการ)", "Lopburi (ลพบุรี)", "Kanchanaburi (กาญจนบุรี)"])
+            subregion = st.text_input("Enter District/City (อำเภอ/เมือง) (optional)")
+            
+        elif country == "Japan":
+            region = st.selectbox("Select Prefecture", 
+                              ["Tokyo (東京)", "Osaka (大阪)", "Kyoto (京都)", "Hokkaido (北海道)", 
+                               "Fukuoka (福岡)", "Okinawa (沖縄)", "Aichi (愛知)", "Hiroshima (広島)", 
+                               "Kanagawa (神奈川)", "Hyogo (兵庫)", "Shizuoka (静岡)", "Chiba (千葉)", 
+                               "Saitama (埼玉)", "Miyagi (宮城)", "Nagano (長野)", "Kumamoto (熊本)", 
+                               "Kagoshima (鹿児島)", "Niigata (新潟)", "Nara (奈良)", "Yamaguchi (山口)"])
+            subregion = st.text_input("Enter City (市区町村) (optional)")
+            
+        elif country == "South Korea":
+            region = st.selectbox("Select Province/Metropolitan City", 
+                              ["Seoul (서울)", "Busan (부산)", "Incheon (인천)", "Daegu (대구)", 
+                               "Daejeon (대전)", "Gwangju (광주)", "Ulsan (울산)", "Sejong (세종)", 
+                               "Gyeonggi (경기도)", "Gangwon (강원도)", "Chungbuk (충청북도)", 
+                               "Chungnam (충청남도)", "Jeonbuk (전라북도)", "Jeonnam (전라남도)", 
+                               "Gyeongbuk (경상북도)", "Gyeongnam (경상남도)", "Jeju (제주도)"])
+            subregion = st.text_input("Enter City/District (시/구) (optional)")
+            
+        elif country == "Vietnam":
+            region = st.selectbox("Select Province/City", 
+                              ["Hanoi (Hà Nội)", "Ho Chi Minh City (Thành phố Hồ Chí Minh)", 
+                               "Da Nang (Đà Nẵng)", "Hai Phong (Hải Phòng)", "Can Tho (Cần Thơ)", 
+                               "Quang Ninh (Quảng Ninh)", "Khanh Hoa (Khánh Hòa)", "Lao Cai (Lào Cai)", 
+                               "Thua Thien Hue (Thừa Thiên Huế)", "Quang Nam (Quảng Nam)", 
+                               "Binh Duong (Bình Dương)", "Dong Nai (Đồng Nai)", "Ba Ria-Vung Tau (Bà Rịa-Vũng Tàu)"])
+            subregion = st.text_input("Enter District (Quận/Huyện) (optional)")
+            
+        elif country in ["Indonesia", "Malaysia", "Myanmar", "Nepal", "Bhutan", "Bangladesh", 
+                         "Cambodia", "Taiwan", "Mongolia", "Kazakhstan", "Kyrgyzstan", 
+                         "Uzbekistan", "Singapore", "Hong Kong", "Laos"]:
+            region = st.text_input(f"Enter Province/Region in {country}")
+            subregion = st.text_input("Enter City/District (optional)")
         
         else:  # Other countries
             region = st.text_input("Enter Region/Province/State")
