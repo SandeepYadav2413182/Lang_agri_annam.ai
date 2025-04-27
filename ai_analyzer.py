@@ -40,8 +40,19 @@ class WeatherPatternAnalyzer:
             return results
         
         try:
+            # Create a safe copy of the data
+            historical_df_copy = historical_df.copy()
+            
+            # Make sure date is not an index for processing
+            if isinstance(historical_df_copy.index, pd.DatetimeIndex):
+                historical_df_copy = historical_df_copy.reset_index()
+            
+            # Handle duplicate dates if any exist
+            if 'date' in historical_df_copy.columns and historical_df_copy['date'].duplicated().any():
+                historical_df_copy = historical_df_copy.drop_duplicates(subset=['date'], keep='first')
+            
             # Prepare data
-            analysis_df = self._prepare_data_for_analysis(historical_df)
+            analysis_df = self._prepare_data_for_analysis(historical_df_copy)
             
             # Detect anomalies in historical data
             anomalies = self._detect_anomalies(analysis_df)
@@ -50,13 +61,16 @@ class WeatherPatternAnalyzer:
             patterns = self._identify_patterns(analysis_df)
             
             # Analyze trends
-            trends = self._analyze_trends(historical_df)
+            trends = self._analyze_trends(historical_df_copy)
+            
+            # Create safe copy of forecast data
+            forecast_df_copy = forecast_df.copy() if not forecast_df.empty else pd.DataFrame()
             
             # Predict upcoming weather based on patterns and forecast
-            predictions = self._predict_upcoming_conditions(historical_df, forecast_df)
+            predictions = self._predict_upcoming_conditions(historical_df_copy, forecast_df_copy)
             
             # Generate natural language summary and insights
-            summary = self._generate_summary(historical_df, forecast_df, anomalies, trends, patterns, predictions)
+            summary = self._generate_summary(historical_df_copy, forecast_df_copy, anomalies, trends, patterns, predictions)
             
             # Compile results
             results['summary'] = summary
@@ -68,7 +82,11 @@ class WeatherPatternAnalyzer:
         
         except Exception as e:
             print(f"Error in analyze_patterns: {str(e)}")
-            results['summary'] = "An error occurred during weather pattern analysis."
+            import traceback
+            traceback.print_exc()
+            results['summary'] = "An error occurred during weather pattern analysis. Our team is working to improve accuracy."
+            results['anomalies'] = ["Data analysis temporarily unavailable"]
+            results['trends'] = ["Trend analysis temporarily unavailable"]
             return results
     
     def _prepare_data_for_analysis(self, historical_df):

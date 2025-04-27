@@ -5,6 +5,9 @@ import os
 import datetime
 from dateutil.relativedelta import relativedelta
 import time
+import json
+import random
+from streamlit_chat import message
 
 from weather_service import WeatherService
 from data_processor import DataProcessor
@@ -110,9 +113,213 @@ crop_recommender = CropRecommender()
 st.markdown('<p class="main-header">🌱 FarmWeather AI Advisor</p>', unsafe_allow_html=True)
 st.markdown("### Your personal AI assistant for agricultural planning and weather analysis")
 
-# Create two main tabs for the application
-main_tab, settings_tab = st.tabs(["FarmWeather Dashboard", "Settings"])
+# Initialize chat session variables
+if 'past' not in st.session_state:
+    st.session_state['past'] = []
+if 'generated' not in st.session_state:
+    st.session_state['generated'] = []
+if 'chat_history' not in st.session_state:
+    st.session_state['chat_history'] = []
 
+# Create a function for the chatbot responses
+def get_chatbot_response(user_input, location_data=None, weather_data=None):
+    farming_tips = [
+        "Remember to monitor soil moisture regularly for optimal crop growth.",
+        "Crop rotation helps prevent soil depletion and reduces pest problems.",
+        "Early morning is the best time to water plants to minimize evaporation.",
+        "Consider using mulch to conserve soil moisture and suppress weeds.",
+        "Regular pruning promotes healthier plant growth and better yields.",
+        "Integrated pest management can reduce the need for chemical pesticides.",
+        "Companion planting can enhance growth and naturally repel pests.",
+        "Adding organic matter improves soil structure and fertility.",
+        "Proper spacing between plants ensures good air circulation and reduces disease.",
+        "Harvesting at the right time is crucial for flavor and storage life."
+    ]
+    
+    weather_phrases = [
+        "Let me check the weather data for you.",
+        "Based on the current forecast, you should plan accordingly.",
+        "The weather conditions seem favorable for fieldwork.",
+        "Keep an eye on the forecast for planning your farm activities.",
+        "Weather patterns suggest you might want to adjust your irrigation schedule."
+    ]
+    
+    greeting_inputs = ["hello", "hi", "greetings", "hey", "howdy", "hola"]
+    greeting_responses = [
+        "Hello! How can I help with your farming needs today?",
+        "Hi there! What farming information are you looking for?",
+        "Greetings! I'm your FarmWeather assistant. How can I help?",
+        "Hey! What farming questions do you have today?"
+    ]
+    
+    weather_queries = ["weather", "forecast", "rain", "temperature", "humidity", "wind", "precipitation"]
+    crop_queries = ["crop", "plant", "grow", "seed", "harvest", "yield", "sow"]
+    
+    # Normalize input
+    user_input_lower = user_input.lower()
+    
+    # Check for greetings
+    if any(greeting in user_input_lower for greeting in greeting_inputs):
+        return random.choice(greeting_responses)
+    
+    # Check for weather-related queries
+    elif any(query in user_input_lower for query in weather_queries):
+        if location_data and weather_data:
+            temp = weather_data.get('temperature', 'unknown')
+            desc = weather_data.get('description', 'unknown conditions')
+            return f"The current weather in {location_data['name']} shows {temp}°C with {desc}. Would you like more detailed weather information?"
+        else:
+            return "To provide weather information, please set your location first in the Settings tab."
+    
+    # Check for crop-related queries
+    elif any(query in user_input_lower for query in crop_queries):
+        if location_data:
+            return f"For your location in {location_data['name']}, I can provide crop recommendations. Would you like to see them in the main dashboard?"
+        else:
+            return "I can provide crop recommendations based on your location. Please set your location first in the Settings tab."
+    
+    # Default responses with farming tips
+    else:
+        if "tip" in user_input_lower or "advice" in user_input_lower:
+            return f"Here's a farming tip: {random.choice(farming_tips)}"
+        else:
+            return f"I'm here to help with weather and farming information. You can ask about weather, crops, or request farming tips. If you need to set your location, please go to the Settings tab."
+
+# Create main tabs for the application
+main_tab, profile_tab, chat_tab, settings_tab = st.tabs(["FarmWeather Dashboard", "Profile & Menu", "Chat Assistant", "Settings"])
+
+# Profile & Menu tab
+with profile_tab:
+    st.markdown('<p class="subheader">👨‍🌾 Farmer Profile & Quick Navigation</p>', unsafe_allow_html=True)
+    
+    # User profile section
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### Your Farming Profile")
+    
+    # Basic profile information
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.image("https://img.icons8.com/color/96/000000/farm.png", width=100)
+    
+    with col2:
+        # Get user name or let them set it
+        user_name = st.text_input("Your Name", 
+                                 value="Farmer" if not db.get_or_create_user(user_id=st.session_state.user_id).get('name') else 
+                                 db.get_or_create_user(user_id=st.session_state.user_id).get('name'))
+        
+        if st.button("Update Profile"):
+            # Update user profile
+            db.get_or_create_user(name=user_name)
+            st.success("Profile updated successfully!")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Quick navigation menu
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### Quick Navigation")
+    
+    menu_cols = st.columns(2)
+    with menu_cols[0]:
+        if st.button("📊 Weather Dashboard", use_container_width=True):
+            # Use Streamlit's URL parameters to switch tabs
+            st.session_state.active_tab = "main_tab"
+            st.rerun()
+        
+        if st.button("🌱 Crop Recommendations", use_container_width=True):
+            # Set state to scroll to crop section
+            st.session_state.scroll_to_crops = True
+            st.session_state.active_tab = "main_tab"
+            st.rerun()
+    
+    with menu_cols[1]:
+        if st.button("💬 Chat Assistant", use_container_width=True):
+            st.session_state.active_tab = "chat_tab"
+            st.rerun()
+        
+        if st.button("⚙️ Settings", use_container_width=True):
+            st.session_state.active_tab = "settings_tab"
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Recent activity or saved items
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### Recent Activity")
+    
+    # Show saved locations
+    st.markdown("#### Your Saved Locations")
+    saved_locations = db.get_saved_locations(st.session_state.user_id)
+    
+    if saved_locations:
+        for i, loc in enumerate(saved_locations):
+            if i < 3:  # Show only 3 most recent
+                st.markdown(f"- **{loc['name']}** ({loc['latitude']:.4f}, {loc['longitude']:.4f})")
+        
+        if len(saved_locations) > 3:
+            st.markdown(f"*...and {len(saved_locations)-3} more*")
+    else:
+        st.info("No saved locations yet. Add locations in the Settings tab.")
+    
+    # Show recently searched crops
+    crop_preferences = db.get_crop_preferences(st.session_state.user_id)
+    if crop_preferences:
+        st.markdown("#### Recent Crops")
+        for i, crop in enumerate(crop_preferences):
+            if i < 3:  # Show only 3 most recent
+                st.markdown(f"- **{crop['crop_name']}**" + (" ⭐" if crop['is_favorite'] else ""))
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Chat Assistant tab
+with chat_tab:
+    st.markdown('<p class="subheader">💬 FarmWeather Chat Assistant</p>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("""
+    Ask me anything about:
+    - Weather forecasts and conditions
+    - Crop recommendations for your location
+    - Farming tips and best practices
+    - Seasonal planning advice
+    """)
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Container for chat messages
+    chat_container = st.container()
+    
+    # Input field for user messages
+    user_input = st.text_input("Type your message here...", key="user_message")
+    
+    # Handle user input
+    if st.button("Send") or user_input:
+        if user_input:
+            # Add user input to past messages
+            st.session_state.past.append(user_input)
+            
+            # Generate response
+            response = get_chatbot_response(user_input, 
+                                           location_data=st.session_state.location, 
+                                           weather_data=st.session_state.weather_data)
+            
+            # Add response to generated messages
+            st.session_state.generated.append(response)
+            
+            # Add to chat history
+            st.session_state.chat_history.append((user_input, response))
+            
+            # Clear input field
+            st.session_state.user_message = ""
+    
+    # Display chat messages
+    with chat_container:
+        if st.session_state['generated']:
+            for i in range(len(st.session_state['generated'])):
+                message(st.session_state['past'][i], is_user=True, key=f"user_{i}")
+                message(st.session_state['generated'][i], key=f"bot_{i}")
+        else:
+            st.info("Send a message to start chatting with the FarmWeather Assistant!")
+
+# Settings tab
 with settings_tab:
     st.markdown('<p class="subheader">📍 Location Settings</p>', unsafe_allow_html=True)
     
