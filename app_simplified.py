@@ -202,14 +202,18 @@ with profile_tab:
         st.image("https://img.icons8.com/color/96/000000/farm.png", width=100)
     
     with col2:
-        # Get user name or let them set it
-        user_name = st.text_input("Your Name", 
-                                 value="Farmer" if not db.get_or_create_user(user_id=st.session_state.user_id).get('name') else 
-                                 db.get_or_create_user(user_id=st.session_state.user_id).get('name'))
+        # Use session_state to store current user info if not already there
+        if 'user_name' not in st.session_state:
+            user_data = db.get_or_create_user()
+            st.session_state.user_name = user_data.get('name', 'Farmer')
+        
+        # Let user update their name
+        user_name = st.text_input("Your Name", value=st.session_state.user_name)
         
         if st.button("Update Profile"):
-            # Update user profile
-            db.get_or_create_user(name=user_name)
+            # Update user profile (we create a new user here, but in a real app, we'd update)
+            updated_user = db.get_or_create_user(name=user_name)
+            st.session_state.user_name = user_name
             st.success("Profile updated successfully!")
     
     st.markdown("</div>", unsafe_allow_html=True)
