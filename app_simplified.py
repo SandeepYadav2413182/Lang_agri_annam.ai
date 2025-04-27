@@ -73,16 +73,16 @@ st.markdown("""
 if 'user_id' not in st.session_state:
     # Create anonymous user
     user = db.get_or_create_user()
-    st.session_state.user_id = user.id
+    st.session_state.user_id = user['id']  # Access as dictionary
 
 if 'location' not in st.session_state:
     # Try to load default location from DB
     default_loc = db.get_default_location(st.session_state.user_id)
     if default_loc:
         st.session_state.location = {
-            "lat": default_loc.latitude,
-            "lon": default_loc.longitude,
-            "name": default_loc.name
+            "lat": default_loc['latitude'],  # Access as dictionary
+            "lon": default_loc['longitude'],  # Access as dictionary
+            "name": default_loc['name']  # Access as dictionary
         }
     else:
         st.session_state.location = None
@@ -118,7 +118,7 @@ with settings_tab:
     
     # Get saved locations from database
     saved_locations = db.get_saved_locations(st.session_state.user_id)
-    saved_location_names = ["Select a saved location"] + [loc.name for loc in saved_locations]
+    saved_location_names = ["Select a saved location"] + [loc['name'] for loc in saved_locations]
     
     # Let user select from saved locations
     if saved_locations:
@@ -127,18 +127,18 @@ with settings_tab:
                                          saved_location_names)
         
         if selected_saved_loc != "Select a saved location":
-            selected_loc = next((loc for loc in saved_locations if loc.name == selected_saved_loc), None)
+            selected_loc = next((loc for loc in saved_locations if loc['name'] == selected_saved_loc), None)
             if selected_loc and st.button("Use This Location"):
                 st.session_state.location = {
-                    "lat": selected_loc.latitude,
-                    "lon": selected_loc.longitude,
-                    "name": selected_loc.name
+                    "lat": selected_loc['latitude'],
+                    "lon": selected_loc['longitude'],
+                    "name": selected_loc['name']
                 }
                 # Clear weather data to force refresh
                 st.session_state.weather_data = None
                 st.session_state.historical_data = None
                 st.session_state.forecast_data = None
-                st.success(f"Location set to {selected_loc.name}!")
+                st.success(f"Location set to {selected_loc['name']}!")
                 st.rerun()
     
     # Add a new location
