@@ -55,6 +55,39 @@ class WeatherRecord(Base):
     rainfall = Column(Float, nullable=True)
     description = Column(String(255), nullable=True)
 
+class SoilMoistureSensor(Base):
+    __tablename__ = 'soil_moisture_sensors'
+    
+    id = Column(Integer, primary_key=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    name = Column(String(255))
+    sensor_id = Column(String(255), unique=True)
+    location_name = Column(String(255))
+    latitude = Column(Float)
+    longitude = Column(Float)
+    field_area = Column(String(255), nullable=True)
+    depth = Column(Float, nullable=True)  # Depth in cm
+    sensor_type = Column(String(255), nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    is_active = Column(Boolean, default=True)
+    
+    user = relationship("User", backref="soil_sensors")
+    readings = relationship("SoilMoistureReading", back_populates="sensor", cascade="all, delete-orphan")
+    
+class SoilMoistureReading(Base):
+    __tablename__ = 'soil_moisture_readings'
+    
+    id = Column(Integer, primary_key=True)
+    recorded_at = Column(DateTime, default=datetime.datetime.utcnow)
+    sensor_id = Column(Integer, ForeignKey('soil_moisture_sensors.id'))
+    moisture_percentage = Column(Float)  # Value between 0-100
+    temperature = Column(Float, nullable=True)  # Soil temperature in Celsius
+    electrical_conductivity = Column(Float, nullable=True)  # EC value in µS/cm
+    battery_level = Column(Float, nullable=True)  # Percentage of battery remaining
+    signal_strength = Column(Integer, nullable=True)  # Signal strength in dBm
+    
+    sensor = relationship("SoilMoistureSensor", back_populates="readings")
+
 # Database connection setup
 def get_engine():
     """Get database engine using environment variables"""
@@ -274,6 +307,190 @@ def get_weather_history(latitude, longitude, days=30):
                 'description': rec.description
             } 
             for rec in records
+        ]
+    finally:
+        session.close()
+
+# Soil moisture sensor functions
+def register_soil_moisture_sensor(user_id, name, sensor_id, location_name, latitude, longitude, 
+                                field_area=None, depth=None, sensor_type=None):
+    """Register a new soil moisture sensor for a user"""
+    session = get_session()
+    
+    try:
+        # Check if sensor_id already exists
+        existing = session.query(SoilMoistureSensor).filter_by(sensor_id=sensor_id).first()
+        if existing:
+            return None  # Sensor ID must be unique
+        
+        sensor = SoilMoistureSensor(
+            user_id=user_id,
+            name=name,
+            sensor_id=sensor_id,
+            location_name=location_name,
+            latitude=latitude,
+            longitude=longitude,
+            field_area=field_area,
+            depth=depth,
+            sensor_type=sensor_type,
+            is_active=True
+        )
+        session.add(sensor)
+        session.commit()
+        
+        # Create a dictionary with the sensor data to return
+        sensor_data = {
+            'id': sensor.id,
+            'name': sensor.name,
+            'sensor_id': sensor.sensor_id,
+            'location_name': sensor.location_name,
+            'latitude': sensor.latitude,
+            'longitude': sensor.longitude,
+            'field_area': sensor.field_area,
+            'depth': sensor.depth,
+            'sensor_type': sensor.sensor_type,
+            'is_active': sensor.is_active
+        }
+        return sensor_data
+    finally:
+        session.close()
+
+def get_soil_moisture_sensors(user_id):
+    """Get all soil moisture sensors for a user"""
+    session = get_session()
+    try:
+        sensors = session.query(SoilMoistureSensor).filter_by(user_id=user_id).all()
+        # Convert to list of dictionaries to avoid session issues
+        return [
+            {
+                'id': sensor.id,
+                'name': sensor.name,
+                'sensor_id': sensor.sensor_id,
+                'location_name': sensor.location_name,
+                'latitude': sensor.latitude,
+                'longitude': sensor.longitude,
+                'field_area': sensor.field_area,
+                'depth': sensor.depth,
+                'sensor_type': sensor.sensor_type,
+                'is_active': sensor.is_active
+            } 
+            for sensor in sensors
+        ]
+    finally:
+        session.close()
+
+def get_soil_moisture_sensor(sensor_id):
+    """Get a soil moisture sensor by ID"""
+    session = get_session()
+    try:
+        sensor = session.query(SoilMoistureSensor).filter_by(id=sensor_id).first()
+        if sensor:
+            return {
+                'id': sensor.id,
+                'name': sensor.name,
+                'sensor_id': sensor.sensor_id,
+                'location_name': sensor.location_name,
+                'latitude': sensor.latitude,
+                'longitude': sensor.longitude,
+                'field_area': sensor.field_area,
+                'depth': sensor.depth,
+                'sensor_type': sensor.sensor_type,
+                'is_active': sensor.is_active
+            }
+        return None
+    finally:
+        session.close()
+
+def update_soil_moisture_sensor(sensor_id, **kwargs):
+    """Update a soil moisture sensor"""
+    session = get_session()
+    try:
+        sensor = session.query(SoilMoistureSensor).filter_by(id=sensor_id).first()
+        if not sensor:
+            return False
+        
+        # Update specified fields
+        for key, value in kwargs.items():
+            if hasattr(sensor, key):
+                setattr(sensor, key, value)
+        
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+def delete_soil_moisture_sensor(sensor_id):
+    """Delete a soil moisture sensor"""
+    session = get_session()
+    try:
+        sensor = session.query(SoilMoistureSensor).filter_by(id=sensor_id).first()
+        if not sensor:
+            return False
+        
+        session.delete(sensor)
+        session.commit()
+        return True
+    finally:
+        session.close()
+
+def record_soil_moisture_reading(sensor_id, moisture_percentage, temperature=None, 
+                               electrical_conductivity=None, battery_level=None, signal_strength=None):
+    """Record a new reading from a soil moisture sensor"""
+    session = get_session()
+    try:
+        # Verify sensor exists
+        sensor = session.query(SoilMoistureSensor).filter_by(id=sensor_id).first()
+        if not sensor:
+            return None
+        
+        reading = SoilMoistureReading(
+            sensor_id=sensor_id,
+            moisture_percentage=moisture_percentage,
+            temperature=temperature,
+            electrical_conductivity=electrical_conductivity,
+            battery_level=battery_level,
+            signal_strength=signal_strength
+        )
+        session.add(reading)
+        session.commit()
+        
+        return {
+            'id': reading.id,
+            'recorded_at': reading.recorded_at,
+            'sensor_id': reading.sensor_id,
+            'moisture_percentage': reading.moisture_percentage,
+            'temperature': reading.temperature,
+            'electrical_conductivity': reading.electrical_conductivity,
+            'battery_level': reading.battery_level,
+            'signal_strength': reading.signal_strength
+        }
+    finally:
+        session.close()
+
+def get_soil_moisture_readings(sensor_id, days=7):
+    """Get soil moisture readings for a sensor over a specified time period"""
+    session = get_session()
+    try:
+        cutoff_date = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+        
+        readings = session.query(SoilMoistureReading).filter(
+            SoilMoistureReading.sensor_id == sensor_id,
+            SoilMoistureReading.recorded_at >= cutoff_date
+        ).order_by(SoilMoistureReading.recorded_at.asc()).all()
+        
+        # Convert to list of dictionaries to avoid session issues
+        return [
+            {
+                'id': reading.id,
+                'recorded_at': reading.recorded_at,
+                'sensor_id': reading.sensor_id,
+                'moisture_percentage': reading.moisture_percentage,
+                'temperature': reading.temperature,
+                'electrical_conductivity': reading.electrical_conductivity,
+                'battery_level': reading.battery_level,
+                'signal_strength': reading.signal_strength
+            } 
+            for reading in readings
         ]
     finally:
         session.close()

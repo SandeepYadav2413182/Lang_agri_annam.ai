@@ -15,6 +15,7 @@ from ai_analyzer import WeatherPatternAnalyzer
 from crop_recommender import CropRecommender
 from utils import get_state_coordinates, cache_data, load_cached_data
 import database as db
+from soil_moisture_service import soil_moisture_service
 
 # Set page configuration
 st.set_page_config(
@@ -189,8 +190,421 @@ def get_chatbot_response(user_input, location_data=None, weather_data=None):
         else:
             return f"I'm here to help with weather and farming information. You can ask about weather, crops, or request farming tips. If you need to set your location, please go to the Settings tab."
 
+# Initialize soil moisture variables if they don't exist
+if 'soil_moisture_simulation_running' not in st.session_state:
+    st.session_state.soil_moisture_simulation_running = False
+if 'soil_moisture_readings' not in st.session_state:
+    st.session_state.soil_moisture_readings = []
+if 'last_soil_update' not in st.session_state:
+    st.session_state.last_soil_update = None
+
 # Create main tabs for the application
-main_tab, profile_tab, chat_tab, settings_tab = st.tabs(["FarmWeather Dashboard", "Profile & Menu", "Chat Assistant", "Settings"])
+main_tab, soil_tab, profile_tab, chat_tab, settings_tab = st.tabs([
+    "FarmWeather Dashboard", 
+    "Soil Moisture IoT", 
+    "Profile & Menu", 
+    "Chat Assistant", 
+    "Settings"
+])
+
+# Soil Moisture IoT Dashboard tab
+with soil_tab:
+    st.markdown('<p class="subheader">💧 Soil Moisture IoT Dashboard</p>', unsafe_allow_html=True)
+    
+    # Check if user has location set
+    if not st.session_state.location:
+        st.warning("Please set your location in the Settings tab first to use the soil moisture dashboard.")
+    else:
+        # Control panel for simulation
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("### Real-Time Soil Moisture Monitoring")
+        
+        # Explanation text
+        st.markdown("""
+        This dashboard displays real-time data from your soil moisture sensors deployed in the field.
+        Monitor soil conditions, receive alerts, and optimize irrigation based on live sensor data.
+        """)
+        
+        # Simulation controls
+        sim_col1, sim_col2 = st.columns([3, 1])
+        with sim_col1:
+            if not st.session_state.soil_moisture_simulation_running:
+                if st.button("Start Real-Time Monitoring", type="primary", use_container_width=True):
+                    # Start the simulation in a background thread
+                    soil_moisture_service.start_simulation(st.session_state.user_id)
+                    st.session_state.soil_moisture_simulation_running = True
+                    st.session_state.last_soil_update = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    st.rerun()
+            else:
+                if st.button("Stop Monitoring", type="secondary", use_container_width=True):
+                    # Stop the simulation
+                    soil_moisture_service.stop_simulation()
+                    st.session_state.soil_moisture_simulation_running = False
+                    st.rerun()
+        
+        with sim_col2:
+            # Refresh button to manually update data
+            if st.button("Refresh Data", use_container_width=True):
+                st.session_state.last_soil_update = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+        # Display the last update time
+        if st.session_state.last_soil_update:
+            st.caption(f"Last updated: {st.session_state.last_soil_update}")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Get sensor data
+        sensors = db.get_soil_moisture_sensors(st.session_state.user_id)
+        
+        # If simulation is running, get the latest readings
+        if st.session_state.soil_moisture_simulation_running:
+            latest_readings = soil_moisture_service.get_latest_readings(max_items=10)
+            if latest_readings:
+                st.session_state.soil_moisture_readings = latest_readings + st.session_state.soil_moisture_readings
+                # Keep only the most recent 100 readings to avoid memory issues
+                st.session_state.soil_moisture_readings = st.session_state.soil_moisture_readings[:100]
+        
+        # Display sensor cards if we have sensors
+        if sensors:
+            # Summary stats at the top
+            st.markdown("### Field Overview")
+            
+            # Create metrics for average moisture, temperature, etc.
+            metric_cols = st.columns(4)
+            
+            # Calculate average values if we have readings
+            avg_moisture = None
+            avg_temp = None
+            avg_battery = None
+            critical_sensors = 0
+            
+            if st.session_state.soil_moisture_readings:
+                # Group readings by sensor
+                sensor_readings = {}
+                for reading in st.session_state.soil_moisture_readings:
+                    sensor_id = reading['sensor_id']
+                    if sensor_id not in sensor_readings:
+                        sensor_readings[sensor_id] = []
+                    sensor_readings[sensor_id].append(reading)
+                
+                # Get the most recent reading for each sensor
+                latest_by_sensor = []
+                for sensor_id, readings in sensor_readings.items():
+                    if readings:
+                        # Sort by recorded_at in descending order
+                        sorted_readings = sorted(readings, key=lambda r: r['recorded_at'], reverse=True)
+                        latest_by_sensor.append(sorted_readings[0])
+                
+                # Calculate averages from the latest readings
+                if latest_by_sensor:
+                    avg_moisture = sum(r['moisture_percentage'] for r in latest_by_sensor) / len(latest_by_sensor)
+                    
+                    # Some readings might not have temperature data
+                    temps = [r['temperature'] for r in latest_by_sensor if r['temperature'] is not None]
+                    if temps:
+                        avg_temp = sum(temps) / len(temps)
+                    
+                    # Count sensors with critical moisture levels
+                    for reading in latest_by_sensor:
+                        status = soil_moisture_service.get_moisture_status(reading['moisture_percentage'])
+                        if status['condition'] == 'danger':
+                            critical_sensors += 1
+                    
+                    # Calculate average battery level
+                    batteries = [r['battery_level'] for r in latest_by_sensor if r['battery_level'] is not None]
+                    if batteries:
+                        avg_battery = sum(batteries) / len(batteries)
+            
+            # Display metrics
+            with metric_cols[0]:
+                if avg_moisture is not None:
+                    st.metric("Avg. Soil Moisture", f"{avg_moisture:.1f}%")
+                else:
+                    st.metric("Avg. Soil Moisture", "N/A")
+            
+            with metric_cols[1]:
+                if avg_temp is not None:
+                    st.metric("Avg. Soil Temperature", f"{avg_temp:.1f}°C")
+                else:
+                    st.metric("Avg. Soil Temperature", "N/A")
+            
+            with metric_cols[2]:
+                st.metric("Sensors Needing Attention", f"{critical_sensors}")
+            
+            with metric_cols[3]:
+                if avg_battery is not None:
+                    st.metric("Avg. Battery Level", f"{avg_battery:.1f}%")
+                else:
+                    st.metric("Avg. Battery Level", "N/A")
+            
+            # Individual sensor cards
+            st.markdown("### Soil Moisture Sensors")
+            
+            # Create a grid of sensor cards
+            sensor_rows = [sensors[i:i + 2] for i in range(0, len(sensors), 2)]
+            
+            for row in sensor_rows:
+                cols = st.columns(2)
+                for i, sensor in enumerate(row):
+                    with cols[i]:
+                        # Find the latest reading for this sensor
+                        latest_reading = None
+                        if st.session_state.soil_moisture_readings:
+                            # Filter readings for this sensor and sort by time
+                            sensor_readings = [r for r in st.session_state.soil_moisture_readings 
+                                            if r['sensor_id'] == sensor['id']]
+                            if sensor_readings:
+                                # Get the most recent reading
+                                sensor_readings.sort(key=lambda r: r['recorded_at'], reverse=True)
+                                latest_reading = sensor_readings[0]
+                        
+                        # Display the sensor card
+                        st.markdown(f'<div class="card">', unsafe_allow_html=True)
+                        
+                        # Sensor header with name and location
+                        st.markdown(f"#### {sensor['name']}")
+                        st.caption(f"Location: {sensor['location_name']} | Field: {sensor['field_area'] or 'Unknown'}")
+                        st.caption(f"Depth: {sensor['depth'] or 'Unknown'} cm | Type: {sensor['sensor_type'] or 'Standard'}")
+                        
+                        # Display data from latest reading if available
+                        if latest_reading:
+                            # Format timestamp
+                            if isinstance(latest_reading['recorded_at'], str):
+                                timestamp_str = latest_reading['recorded_at']
+                            else:
+                                timestamp_str = latest_reading['recorded_at'].strftime("%Y-%m-%d %H:%M:%S")
+                            
+                            st.caption(f"Last updated: {timestamp_str}")
+                            
+                            # Check soil moisture status
+                            moisture = latest_reading['moisture_percentage']
+                            status = soil_moisture_service.get_moisture_status(moisture)
+                            
+                            # Display the moisture value with appropriate styling
+                            if status['condition'] == 'danger':
+                                st.markdown(f'<div class="danger-box">', unsafe_allow_html=True)
+                            elif status['condition'] == 'warning':
+                                st.markdown(f'<div class="warning-box">', unsafe_allow_html=True)
+                            else:
+                                st.markdown(f'<div class="success-box">', unsafe_allow_html=True)
+                            
+                            st.markdown(f"**Moisture:** {moisture:.1f}% - **{status['status']}**")
+                            st.markdown(f"*{status['recommendation']}*")
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            
+                            # Display additional sensor data
+                            data_cols = st.columns(3)
+                            with data_cols[0]:
+                                if latest_reading['temperature'] is not None:
+                                    st.metric("Soil Temp", f"{latest_reading['temperature']:.1f}°C")
+                                else:
+                                    st.metric("Soil Temp", "N/A")
+                            
+                            with data_cols[1]:
+                                if latest_reading['electrical_conductivity'] is not None:
+                                    st.metric("EC", f"{latest_reading['electrical_conductivity']:.0f} µS/cm")
+                                else:
+                                    st.metric("EC", "N/A")
+                            
+                            with data_cols[2]:
+                                if latest_reading['battery_level'] is not None:
+                                    st.metric("Battery", f"{latest_reading['battery_level']:.0f}%")
+                                else:
+                                    st.metric("Battery", "N/A")
+                        else:
+                            st.info("No readings available for this sensor yet. Start monitoring to collect data.")
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Historical data visualization
+            st.markdown("### Historical Moisture Trends")
+            
+            # Only show historical data if we have readings
+            if st.session_state.soil_moisture_readings:
+                # Prepare data for plotting
+                plot_data = pd.DataFrame(st.session_state.soil_moisture_readings)
+                
+                # Convert recorded_at to datetime if it's a string
+                if 'recorded_at' in plot_data.columns and plot_data['recorded_at'].dtype == 'object':
+                    plot_data['recorded_at'] = pd.to_datetime(plot_data['recorded_at'])
+                
+                # Sort by time
+                plot_data = plot_data.sort_values('recorded_at')
+                
+                # Get sensors for filtering
+                sensor_names = {sensor['id']: sensor['name'] for sensor in sensors}
+                plot_data['sensor_name'] = plot_data['sensor_id'].map(sensor_names)
+                
+                # Add a selector for which sensors to display
+                selected_sensors = st.multiselect(
+                    "Select sensors to display",
+                    options=list(sensor_names.values()),
+                    default=list(sensor_names.values())[:min(3, len(sensor_names))]
+                )
+                
+                # Filter data for selected sensors
+                if selected_sensors:
+                    plot_filtered = plot_data[plot_data['sensor_name'].isin(selected_sensors)]
+                    
+                    # Create the time series plot
+                    if not plot_filtered.empty and 'recorded_at' in plot_filtered.columns:
+                        fig = px.line(
+                            plot_filtered,
+                            x='recorded_at',
+                            y='moisture_percentage',
+                            color='sensor_name',
+                            labels={
+                                'recorded_at': 'Time',
+                                'moisture_percentage': 'Soil Moisture (%)',
+                                'sensor_name': 'Sensor'
+                            },
+                            title='Soil Moisture Trends Over Time'
+                        )
+                        
+                        # Add horizontal lines for critical thresholds
+                        fig.add_shape(
+                            type="line",
+                            x0=plot_filtered['recorded_at'].min(),
+                            x1=plot_filtered['recorded_at'].max(),
+                            y0=20,
+                            y1=20,
+                            line=dict(color="red", width=2, dash="dash"),
+                            name="Critical Dry"
+                        )
+                        
+                        fig.add_shape(
+                            type="line",
+                            x0=plot_filtered['recorded_at'].min(),
+                            x1=plot_filtered['recorded_at'].max(),
+                            y0=80,
+                            y1=80,
+                            line=dict(color="red", width=2, dash="dash"),
+                            name="Over-Saturated"
+                        )
+                        
+                        # Update layout
+                        fig.update_layout(
+                            height=500,
+                            xaxis_title="Time",
+                            yaxis_title="Soil Moisture (%)",
+                            legend_title="Sensor",
+                            hovermode="x unified"
+                        )
+                        
+                        # Display the plot
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Create a temperature plot if we have temperature data
+                        temp_data = plot_filtered[plot_filtered['temperature'].notna()]
+                        if not temp_data.empty:
+                            temp_fig = px.line(
+                                temp_data,
+                                x='recorded_at',
+                                y='temperature',
+                                color='sensor_name',
+                                labels={
+                                    'recorded_at': 'Time',
+                                    'temperature': 'Soil Temperature (°C)',
+                                    'sensor_name': 'Sensor'
+                                },
+                                title='Soil Temperature Trends'
+                            )
+                            
+                            # Update layout
+                            temp_fig.update_layout(
+                                height=400,
+                                xaxis_title="Time",
+                                yaxis_title="Temperature (°C)",
+                                legend_title="Sensor",
+                                hovermode="x unified"
+                            )
+                            
+                            # Display the plot
+                            st.plotly_chart(temp_fig, use_container_width=True)
+                    else:
+                        st.info("Not enough data to generate plots. Continue monitoring to collect more data.")
+                else:
+                    st.warning("Please select at least one sensor to display data.")
+            else:
+                st.info("No historical data available yet. Start the real-time monitoring to collect data.")
+        else:
+            # No sensors available
+            st.info("No soil moisture sensors registered yet. Start real-time monitoring to automatically register sensors based on your saved locations.")
+            
+            # Explain what soil moisture sensors do
+            st.markdown("### What are Soil Moisture Sensors?")
+            st.markdown("""
+            Soil moisture sensors are IoT devices that measure the water content in soil. They help farmers:
+            
+            - Optimize irrigation schedules and reduce water usage
+            - Prevent over-watering and under-watering of crops
+            - Monitor field conditions remotely without physical inspection
+            - Detect irrigation system failures or leaks
+            - Improve crop yield and quality through precise water management
+            
+            This dashboard simulates real-time IoT sensor data to demonstrate how you can monitor soil conditions 
+            across your fields using FarmWeather AI Advisor.
+            """)
+        
+        # Sensor management section
+        st.markdown("### Sensor Management")
+        
+        # Allow manual registration of sensors
+        with st.expander("Register a New Soil Moisture Sensor"):
+            # Form to register a new sensor
+            with st.form("sensor_registration_form"):
+                sensor_name = st.text_input("Sensor Name", placeholder="e.g., North Field Sensor 1")
+                sensor_id = st.text_input("Sensor ID/Serial Number", placeholder="e.g., SM12345")
+                
+                # Get locations for dropdown
+                locations = db.get_saved_locations(st.session_state.user_id)
+                location_options = [f"{loc['name']} ({loc['latitude']:.4f}, {loc['longitude']:.4f})" for loc in locations]
+                
+                selected_location = st.selectbox("Sensor Location", options=["Select a location"] + location_options)
+                
+                field_area = st.text_input("Field/Area", placeholder="e.g., North Field")
+                
+                sensor_type = st.selectbox(
+                    "Sensor Type", 
+                    options=["Capacitive", "Resistive", "Time Domain Reflectometry (TDR)", "Other"]
+                )
+                
+                depth = st.number_input("Installation Depth (cm)", min_value=0.0, max_value=100.0, value=10.0, step=1.0)
+                
+                # Submit button
+                submit_button = st.form_submit_button("Register Sensor")
+                
+                if submit_button:
+                    if sensor_name and sensor_id and selected_location != "Select a location":
+                        # Get the selected location data
+                        location_idx = location_options.index(selected_location) if selected_location in location_options else -1
+                        
+                        if location_idx >= 0:
+                            location = locations[location_idx]
+                            
+                            # Register the sensor
+                            result = db.register_soil_moisture_sensor(
+                                user_id=st.session_state.user_id,
+                                name=sensor_name,
+                                sensor_id=sensor_id,
+                                location_name=location['name'],
+                                latitude=location['latitude'],
+                                longitude=location['longitude'],
+                                field_area=field_area,
+                                depth=depth,
+                                sensor_type=sensor_type if sensor_type != "Other" else None
+                            )
+                            
+                            if result:
+                                st.success(f"Sensor '{sensor_name}' registered successfully!")
+                                # Refresh the page to show the new sensor
+                                st.rerun()
+                            else:
+                                st.error("Failed to register sensor. This sensor ID may already be in use.")
+                        else:
+                            st.error("Invalid location selected.")
+                    else:
+                        st.error("Please fill in all required fields (Sensor Name, Sensor ID, and Location).")
 
 # Profile & Menu tab
 with profile_tab:
@@ -270,7 +684,7 @@ with profile_tab:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("### Quick Navigation")
     
-    menu_cols = st.columns(2)
+    menu_cols = st.columns(3)
     with menu_cols[0]:
         if st.button("📊 Weather Dashboard", use_container_width=True):
             # Use Streamlit's URL parameters to switch tabs
@@ -284,8 +698,17 @@ with profile_tab:
             st.rerun()
     
     with menu_cols[1]:
+        if st.button("💧 Soil Moisture IoT", use_container_width=True):
+            st.session_state.active_tab = "soil_tab"
+            st.rerun()
+            
         if st.button("💬 Chat Assistant", use_container_width=True):
             st.session_state.active_tab = "chat_tab"
+            st.rerun()
+    
+    with menu_cols[2]:
+        if st.button("👨‍🌾 My Profile", use_container_width=True):
+            st.session_state.active_tab = "profile_tab"
             st.rerun()
         
         if st.button("⚙️ Settings", use_container_width=True):
